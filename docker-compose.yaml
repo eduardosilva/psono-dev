@@ -1,0 +1,43 @@
+# Docker Compose file for setting up PSONO server and PostgreSQL database containers
+services:
+  # PostgreSQL database container
+  psono-database:
+    container_name: psono-database
+    image: postgres:13-alpine
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"  # Enable automatic updates with Watchtower
+    environment:
+      POSTGRES_USER: psono  # Set PostgreSQL username
+      POSTGRES_PASSWORD: psono  # Set PostgreSQL password
+    volumes:
+      - type: bind
+        source: ./data/postgres  # Mount volume for persisting PostgreSQL data
+        target: /var/lib/postgresql/data
+    restart: always  # Always restart the container on failure
+    ports:
+      - "5432:5432"  # Expose PostgreSQL port
+
+  # PSONO server container
+  psono-combo:
+    container_name: psono-combo
+    image: psono/psono-combo:latest  # Use latest PSONO server image
+    ports:
+      - "10200:80"  # Expose PSONO server port
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"  # Enable automatic updates with Watchtower
+    depends_on:
+      - psono-database  # Ensure PostgreSQL database container is running before starting PSONO server
+    command: sh -c "sleep 10 && /bin/sh /root/configs/docker/cmd.sh"  # Delay start to ensure database is ready
+    volumes:
+      - type: bind
+        source: ./config/settings.yaml  # Mount volume for server-specific settings
+        target: /root/.psono_server/settings.yaml
+      - type: bind
+        source: ./config/config.json  # Mount volume for server configuration
+        target: /usr/share/nginx/html/config.json
+      - type: bind
+        source: ./config/config.json  # Mount volume for portal configuration
+        target: /usr/share/nginx/html/portal/config.json
+    sysctls:
+      - net.core.somaxconn=65535  # Set maximum connection limit
+    restart: always  # Always restart the container on failure
